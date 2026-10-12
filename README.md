@@ -1,3 +1,4 @@
+
 # Lab 3: A Mini Coding Agent
 
 ## Project Overview
@@ -96,7 +97,7 @@ python -m unittest discover -v
 
 ### Automated Unit Tests
 
-The test suite was subsequently expanded to 11 tests covering:
+The test suite was subsequently expanded to 12 tests covering:
 
 1. Listing project files.
 2. Reading project files.
@@ -109,18 +110,23 @@ The test suite was subsequently expanded to 11 tests covering:
 9. Rejecting unexpected arguments for `run_tests`.
 10. Blocking unsafe paths through the tool dispatcher.
 11. Verifying the configured maximum step count of 20.
+12. Verifying that the agent loop actually stops after 20 iterations.
 
 The latest test run produced:
 
 ```text
-Ran 11 tests in 0.010s
+Ran 12 tests in 0.012s
 
 OK
 ```
 
-**Result: 11 out of 11 automated tests passed.**
+**Result: 12 out of 12 automated tests passed.**
 
-The maximum-step test checks the configured value; it does not simulate a complete 20-step agent conversation.
+The test suite verifies both the configured maximum step count and the agent's actual stopping behavior.
+
+The new iteration-limit test uses a mocked model that repeatedly requests a tool. The test confirms that the agent stops after exactly 20 iterations rather than continuing indefinitely.
+
+This test does not require a running Ollama server because the model responses are simulated.
 
 ## Comparison with the Reference Agent
 
@@ -146,6 +152,9 @@ A detailed comparison is available in [writeup.md](writeup.md).
 
 This mini coding agent demonstrates the essential components of an LLM-based coding agent, including structured tool calling, iterative execution, workspace context, input validation, permission handling, and bounded execution.
 
-The agent was tested manually using Ollama, and all 11 automated unit tests passed.
+The agent was tested manually using Ollama, and all 12 automated unit tests passed.
 
-The comparison with `rasbt/mini-coding-agent` also highlights possible future improvements while keeping the current implementation focused on the requirements of Lab 3.
+The automated tests also confirmed that the agent correctly stops after reaching the maximum limit of 20 iterations.
+
+The comparison with `rasbt/mini-coding-agent` highlights possible future improvements while keeping the current implementation focused on the requirements of Lab 3.
+
