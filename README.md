@@ -21,11 +21,13 @@ Each tool includes a description and parameter schema to help the language model
 
 ## Agent Loop
 
-The agent sends the user's request, system instructions, and available tool definitions to the Ollama model.
+The agent uses the OpenAI Python client to communicate with a locally running Ollama server through its OpenAI-compatible API endpoint (`http://localhost:11434/v1`).
 
-When the model requests a tool, the program validates the request, executes the appropriate tool, and returns the result to the model.
+The agent sends the user's request, system instructions, and tool definitions to the `llama3.1:8b` model.
 
-The process repeats until the model provides a final response or the maximum limit of 20 iterations is reached.
+When the model requests a tool, the program validates its arguments, executes the appropriate operation, and returns the result using the corresponding tool call ID.
+
+The process repeats until the model produces a final response or the maximum limit of 20 iterations is reached.
 
 ## Safety Features
 
