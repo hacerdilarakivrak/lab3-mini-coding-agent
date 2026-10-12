@@ -37,13 +37,17 @@ class TestMiniCodingAgent(unittest.TestCase):
 
     def test_block_access_outside_project(self):
         with tempfile.TemporaryDirectory() as directory:
-            with patch.object(agent, "PROJECT_ROOT", Path(directory)):
+            with patch.object(
+                agent, "PROJECT_ROOT", Path(directory)
+            ):
                 with self.assertRaises(ValueError):
                     agent.safe_path("../outside.txt")
 
     def test_run_tests_requires_approval(self):
         with patch("builtins.input", return_value="no"):
-            with patch.object(agent.subprocess, "run") as mock_run:
+            with patch.object(
+                agent.subprocess, "run"
+            ) as mock_run:
                 result = agent.run_tests()
 
         self.assertEqual(
@@ -53,6 +57,7 @@ class TestMiniCodingAgent(unittest.TestCase):
 
     def test_unknown_tool_is_rejected(self):
         result = agent.execute_tool("delete_file", {})
+
         self.assertEqual(
             result, "Unknown tool. Execution denied."
         )
@@ -61,12 +66,14 @@ class TestMiniCodingAgent(unittest.TestCase):
         result = agent.execute_tool(
             "read_file", {"filename": 123}
         )
+
         self.assertEqual(
             result, "Filename must be a string."
         )
 
     def test_missing_filename_is_rejected(self):
         result = agent.execute_tool("read_file", {})
+
         self.assertEqual(
             result, "Invalid read_file arguments."
         )
@@ -75,6 +82,7 @@ class TestMiniCodingAgent(unittest.TestCase):
         result = agent.execute_tool(
             "list_files", {"extra": "value"}
         )
+
         self.assertEqual(result, "Unexpected arguments.")
 
     def test_run_tests_rejects_unexpected_arguments(self):
@@ -88,7 +96,9 @@ class TestMiniCodingAgent(unittest.TestCase):
 
     def test_execute_tool_blocks_outside_path(self):
         with tempfile.TemporaryDirectory() as directory:
-            with patch.object(agent, "PROJECT_ROOT", Path(directory)):
+            with patch.object(
+                agent, "PROJECT_ROOT", Path(directory)
+            ):
                 result = agent.execute_tool(
                     "read_file",
                     {"filename": "../outside.txt"}
@@ -104,19 +114,36 @@ class TestMiniCodingAgent(unittest.TestCase):
 
     def test_agent_stops_after_twenty_iterations(self):
         tool_call = SimpleNamespace(
+            id="call_1",
             function=SimpleNamespace(
                 name="list_files",
-                arguments={}
+                arguments="{}"
             )
         )
 
         model_message = SimpleNamespace(
             tool_calls=[tool_call],
-            content=""
+            content="",
+            model_dump=lambda exclude_none=True: {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {
+                            "name": "list_files",
+                            "arguments": "{}"
+                        }
+                    }
+                ]
+            }
         )
 
         model_response = SimpleNamespace(
-            message=model_message
+            choices=[
+                SimpleNamespace(message=model_message)
+            ]
         )
 
         with patch(
@@ -127,17 +154,22 @@ class TestMiniCodingAgent(unittest.TestCase):
                 agent, "list_files", return_value="[]"
             ):
                 with patch.object(
-                    agent,
-                    "chat",
-                    return_value=model_response
-                ) as mock_chat:
+                    agent, "CLIENT"
+                ) as mock_client:
+                    mock_client.chat.completions.create.return_value = (
+                        model_response
+                    )
+
                     with patch(
                         "sys.stdout",
                         new_callable=StringIO
                     ) as output:
                         agent.main()
 
-        self.assertEqual(mock_chat.call_count, 20)
+        self.assertEqual(
+            mock_client.chat.completions.create.call_count,
+            20
+        )
 
         self.assertIn(
             "Stopped: maximum 20 steps reached.",
