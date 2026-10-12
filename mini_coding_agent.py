@@ -1,13 +1,21 @@
 
+
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
-from ollama import chat
+from openai import OpenAI
 
 MODEL = "llama3.1:8b"
 PROJECT_ROOT = Path(__file__).resolve().parent
 MAX_STEPS = 20
+
+# OpenAI-compatible API using local Ollama
+CLIENT = OpenAI(
+    base_url="http://localhost:11434/v1",
+    api_key="ollama",
+)
 
 
 def safe_path(filename):
@@ -19,46 +27,56 @@ def safe_path(filename):
 
 def list_files():
     files = []
+
     for root, dirs, names in os.walk(PROJECT_ROOT):
         dirs[:] = [
             d for d in dirs
             if d not in {".git", "__pycache__", ".venv", "venv"}
             and not (Path(root) / d).is_symlink()
         ]
+
         for name in names:
             path = Path(root) / name
+
             if path.is_file() and not path.is_symlink():
                 files.append(str(path.relative_to(PROJECT_ROOT)))
+
     return json.dumps(files[:100])
 
 
 def read_file(filename):
     path = safe_path(filename)
+
     if not path.is_file():
         return "File not found."
+
     if path.stat().st_size > 100_000:
         return "File too large."
+
     return path.read_text(encoding="utf-8")
 
 
 def run_tests():
     approval = input("Allow running tests? (yes/no): ")
+
     if approval.strip().lower() != "yes":
         return "Test execution denied by user."
 
     try:
         result = subprocess.run(
-            ["python", "-m", "unittest", "discover"],
+            [sys.executable, "-m", "unittest", "discover"],
             cwd=PROJECT_ROOT,
             capture_output=True,
             text=True,
             timeout=30,
             shell=False,
         )
+
         return (
             f"Exit code: {result.returncode}\n"
             + (result.stdout + result.stderr)[-5000:]
         )
+
     except subprocess.TimeoutExpired:
         return "Tests timed out."
 
@@ -116,19 +134,24 @@ def execute_tool(name, arguments):
         if name == "list_files":
             if arguments:
                 return "Unexpected arguments."
+
             return list_files()
 
         if name == "read_file":
             if set(arguments) != {"filename"}:
                 return "Invalid read_file arguments."
+
             filename = arguments["filename"]
+
             if not isinstance(filename, str):
                 return "Filename must be a string."
+
             return read_file(filename)
 
         if name == "run_tests":
             if arguments:
                 return "Unexpected arguments."
+
             return run_tests()
 
         return "Unknown tool. Execution denied."
@@ -157,37 +180,54 @@ def main():
                 "Project structure:\n" + structure
             ),
         },
-        {"role": "user", "content": question},
+        {
+            "role": "user",
+            "content": question,
+        },
     ]
 
     for step in range(MAX_STEPS):
         print(f"\nStep {step + 1}/{MAX_STEPS}")
 
-        response = chat(
+        # Call the model through OpenAI-compatible API
+        response = CLIENT.chat.completions.create(
             model=MODEL,
             messages=messages,
             tools=TOOLS,
-            options={"temperature": 0.0},
+            temperature=0.0,
         )
 
-        messages.append(response.message)
+        message = response.choices[0].message
 
-        calls = response.message.tool_calls or []
+        # Append assistant response
+        messages.append(
+            message.model_dump(exclude_none=True)
+        )
 
+        calls = message.tool_calls or []
+
+        # Stop when the model gives a final answer
         if not calls:
-            print("\nAgent:", response.message.content)
+            print("\nAgent:", message.content)
             return
 
+        # Execute requested tools
         for call in calls:
             name = call.function.name
-            arguments = call.function.arguments
+
+            try:
+                arguments = json.loads(call.function.arguments)
+            except (json.JSONDecodeError, TypeError):
+                arguments = None
+
             print("Tool:", name)
 
             result = execute_tool(name, arguments)
 
+            # Return tool result using the tool call ID
             messages.append({
                 "role": "tool",
-                "tool_name": name,
+                "tool_call_id": call.id,
                 "content": result,
             })
 
