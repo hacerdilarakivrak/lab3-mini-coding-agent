@@ -1,3 +1,4 @@
+
 # Lab 3 Writeup: A Mini Coding Agent
 
 ## 1. Project Overview
@@ -60,6 +61,8 @@ The system message also instructs the model to use the available tools, avoid in
 
 The agent uses a maximum of 20 loop iterations. If the model does not finish within this limit, the program stops and displays a message explaining that the maximum number of steps has been reached.
 
+This stopping behavior was verified through an automated test that simulated repeated tool requests from the language model.
+
 ## 6. Testing and Results
 
 I tested the agent using Ollama and the `llama3.1:8b` language model.
@@ -76,7 +79,7 @@ I tested the agent using Ollama and the `llama3.1:8b` language model.
 
 ### Automated Unit Testing
 
-I later expanded the automated test suite to include 11 tests covering:
+I later expanded the automated test suite to include 12 tests covering:
 
 1. Listing project files.
 2. Reading project files.
@@ -89,22 +92,31 @@ I later expanded the automated test suite to include 11 tests covering:
 9. Rejecting unexpected arguments for `run_tests`.
 10. Blocking unsafe file paths through the tool dispatcher.
 11. Verifying that the configured maximum step count is 20.
+12. Verifying that the agent loop stops after exactly 20 iterations when the model continues requesting tools.
 
 I ran the following command:
 
-`python -m unittest discover -v`
+```bash
+python -m unittest discover -v
+```
 
 The final result was:
 
-```
-Ran 11 tests in 0.010s
+```text
+Ran 12 tests in 0.012s
 
 OK
 ```
 
-All 11 automated tests passed successfully.
+All 12 automated tests passed successfully.
 
-The step-limit test checks the configured value of 20. It does not independently simulate a complete 20-step model conversation.
+The step-limit tests verify two different aspects of the implementation.
+
+The first test confirms that the configured maximum step count is 20.
+
+The second test uses a mocked language model that repeatedly requests a tool. It verifies that the agent makes exactly 20 model calls and then stops with the expected message.
+
+Because the model responses are simulated, this test does not require an active Ollama server.
 
 ## 7. Challenges and Observations
 
@@ -112,9 +124,11 @@ During the permission-denied test, the language model incorrectly stated that th
 
 This demonstrated that tool execution can behave correctly while the language model still misinterprets the result.
 
-I also encountered a testing issue because an older downloaded project folder contained only four tests. After downloading the updated project files and running the tests from the correct directory, all 11 tests were discovered and passed.
+I also encountered a testing issue because an older downloaded project folder contained only four tests. After downloading the updated project files and running the tests from the correct directory, the expanded test suite was discovered and passed.
 
-These experiences helped me understand the importance of separating tool execution from model-generated explanations and verifying that tests run against the latest version of the code.
+Finally, I added a behavioral test for the 20-iteration stopping condition. This allowed me to verify not only the configured limit but also the actual stopping behavior of the agent loop.
+
+These experiences helped me understand the importance of separating tool execution from model-generated explanations, testing actual program behavior, and verifying that tests run against the latest version of the code.
 
 ## 8. Comparison with rasbt/mini-coding-agent
 
@@ -156,8 +170,10 @@ In this lab, I learned how a language model can interact with programming tools 
 
 I implemented file inspection, controlled test execution, argument validation, project-directory restrictions, user approval, workspace context, and a maximum step limit.
 
-The agent was tested manually with Ollama, and all 11 automated unit tests passed.
+The agent was tested manually with Ollama, and all 12 automated unit tests passed.
 
-Comparing my project with `rasbt/mini-coding-agent` also helped me understand how a simple agent can be extended into a more advanced system.
+The tests also confirmed that the agent correctly stops after 20 iterations when the language model continues requesting tools.
+
+Comparing my project with `rasbt/mini-coding-agent` helped me understand how a simple agent can be extended into a more advanced system.
 
 Overall, this lab improved my understanding of tool calling, agent architecture, safety checks, testing, and the practical limitations of language-model-based coding agents.
